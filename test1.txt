@@ -1,0 +1,117 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Upload Modal Widget</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+    .attach-btn { padding: 12px 24px; background-color: #007bff; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
+    .modal { display: none; position: absolute; top: 60px; left: 20px; background-color: #000; border-radius: 16px; padding: 15px 0; color: #fff; width: 260px; box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5); z-index: 1000; }
+    .modal .option { padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background-color 0.2s ease; }
+    .modal .option:hover { background-color: #222; }
+    .modal .option i { font-size: 18px; margin-left: 12px; }
+    video, canvas, img { display: none; margin-top: 20px; max-width: 100%; border: 2px solid #ccc; border-radius: 8px; }
+    .capture-btns { display: none; margin-top: 10px; text-align: center; }
+    .capture-btns button { margin: 0 5px; padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; background-color: #007bff; color: white; }
+  </style>
+</head>
+<body>
+
+<button class="attach-btn" id="attachBtn">Attach</button>
+
+<div class="modal" id="uploadModal">
+  <div class="option" id="takePhotoOption">Take Photo <i class="fas fa-camera"></i></div>
+  <div class="option" id="photoLibraryOption">Photo Library <i class="fas fa-image"></i></div>
+  <div class="option" id="googleDriveOption">Google Drive <i class="fab fa-google-drive"></i></div>
+  <div class="option" id="chooseFileOption">Choose a File <i class="fas fa-file-alt"></i></div>
+  <div class="option" id="cancelOption">Cancel <i class="fas fa-times"></i></div>
+</div>
+
+<video id="videoPreview" autoplay></video>
+<canvas id="canvas"></canvas>
+<img id="capturedImage" alt="Captured Photo" />
+
+<div class="capture-btns" id="captureBtns">
+  <button id="captureBtn">Capture</button>
+  <button id="stopBtn">Stop</button>
+</div>
+
+<input type="file" id="photoLibraryInput" accept="image/*" style="display: none;" />
+<input type="file" id="chooseFileInput" style="display: none;" />
+
+
+<script>
+  let stream;
+  $('#attachBtn').on('click', () => { $('#uploadModal').toggle(); });
+  $('#cancelOption').on('click', () => { $('#uploadModal').hide(); });
+
+  $('#takePhotoOption').on('click', async () => {
+    $('#uploadModal').hide();
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      $('#videoPreview').get(0).srcObject = stream;
+      $('#videoPreview').show();
+      $('#captureBtns').show();
+    } catch (e) { alert("Camera access denied or not supported."); }
+  });
+
+  $('#captureBtn').on('click', () => {
+  const video = $('#videoPreview').get(0);
+  const canvas = $('#canvas').get(0);
+  const context = canvas.getContext('2d');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = canvas.toDataURL('image/png');
+  $('#capturedImage').attr('src', imageData).show();
+  setTimeout(() => { $('#capturedImage').hide(); }, 5000);
+
+  // Stop camera after capture
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    $('#videoPreview').hide(); 
+    $('#captureBtns').hide();
+  }
+
+  uploadFile(imageData);
+});
+
+
+  $('#stopBtn').on('click', () => {
+    if (stream) { stream.getTracks().forEach(track => track.stop()); }
+    $('#videoPreview').hide(); $('#captureBtns').hide();
+  });
+
+  $('#photoLibraryOption').on('click', () => { $('#photoLibraryInput').click(); });
+  $('#chooseFileOption').on('click', () => { $('#chooseFileInput').click(); });
+  $('#googleDriveOption').on('click', () => { window.open("https://drive.google.com", "_blank"); });
+
+  $('#photoLibraryInput, #chooseFileInput').on('change', function () {
+    const file = this.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        $('#capturedImage').attr('src', e.target.result).show();
+        setTimeout(() => { $('#capturedImage').hide(); }, 5000); // hide after 5 seconds
+        uploadFile(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  function uploadFile(imageData) {
+    $.ajax({
+      url: 'uploadImage.jsp',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ image: imageData }),
+      success: () => alert("Upload successful!"),
+      error: () => alert("Upload failed.")
+    });
+  }
+</script>
+</body>
+</html>
